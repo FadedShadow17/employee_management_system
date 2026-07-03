@@ -3,6 +3,7 @@ import AppLayout from './components/layout/AppLayout.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { Login, Signup, ForgotPassword } from './pages/AuthPages.jsx';
+import { MfaVerify } from './pages/MfaVerify.jsx';
 import AuthLayout from './components/layout/AuthLayout.jsx';
 import { Dashboard } from './pages/Dashboard.jsx';
 import { EmployeeDetail } from './pages/EmployeeDetail.jsx';
@@ -23,7 +24,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <Login /> },
       { path: '/signup', element: <Signup /> },
-      { path: '/forgot-password', element: <ForgotPassword /> }
+      { path: '/forgot-password', element: <ForgotPassword /> },
+      { path: '/mfa-verify', element: <MfaVerify /> }
     ]
   },
   { path: '/403', element: <Forbidden /> },

@@ -28,10 +28,20 @@ const AuthForm = ({ mode }) => {
 
   const onSubmit = async (values) => {
     try {
-      if (mode === 'signup') await signup(values);
-      else await login(values);
-      toast.success(mode === 'signup' ? 'Account created successfully!' : 'Logged in successfully!');
-      navigate('/dashboard');
+      if (mode === 'signup') {
+        await signup(values);
+        toast.success('Account created successfully!');
+        navigate('/dashboard');
+      } else {
+        const result = await login(values);
+        if (result?.mfaRequired) {
+          // Redirect to MFA verification page with temp token
+          navigate('/mfa-verify', { state: { tempToken: result.tempToken } });
+        } else {
+          toast.success('Logged in successfully!');
+          navigate('/dashboard');
+        }
+      }
     } catch (error) {
       toast.error(unwrapError(error));
     }

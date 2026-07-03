@@ -9,7 +9,12 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['Admin', 'HR Manager', 'Employee'], default: 'Employee' },
     employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
     avatar: String,
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+
+    // MFA fields
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, select: false },
+    twoFactorBackupCodes: [{ type: String, select: false }]
   },
   { timestamps: true }
 );

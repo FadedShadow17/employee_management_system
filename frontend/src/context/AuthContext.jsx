@@ -22,9 +22,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (payload) => {
     const { data } = await api.post('/auth/login', payload);
+
+    // If MFA is required, return the temp token for the MFA verification step
+    if (data.mfaRequired) {
+      return { mfaRequired: true, tempToken: data.tempToken };
+    }
+
     localStorage.setItem('ems_token', data.token);
     setUser(data.user);
     toast.success('Welcome back');
+    return { mfaRequired: false };
   };
 
   const signup = async (payload) => {

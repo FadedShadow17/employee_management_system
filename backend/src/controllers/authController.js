@@ -35,6 +35,21 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user || !(await user.comparePassword(password))) throw new AppError('Invalid email or password', 401);
   if (!user.isActive) throw new AppError('Account is inactive', 403);
+
+  // If MFA is enabled, return a temporary token instead of full auth
+  if (user.twoFactorEnabled) {
+    const tempToken = Buffer.from(
+      JSON.stringify({ id: user._id, ts: Date.now() })
+    ).toString('base64');
+
+    return res.json({
+      success: true,
+      mfaRequired: true,
+      tempToken,
+      message: 'Please enter your two-factor authentication code'
+    });
+  }
+
   sendAuth(res, user);
 });
 

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { api, listResource, updateResource } from '../services/api.js';
 import { unwrapError } from '../utils/format.js';
 import { EmptyState, LoadingSkeleton } from '../components/UI.jsx';
+import { MfaSetup } from '../components/MfaSetup.jsx';
 
 export const Notifications = () => {
   const [items, setItems] = useState([]);
@@ -212,11 +213,14 @@ export const Settings = () => {
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Settings</h1>
         <p className="mt-1 text-slate-600 dark:text-slate-400">
-          Manage your application preferences
+          Manage your application preferences and security
         </p>
       </div>
 
       <div className="grid gap-6">
+        {/* Two-Factor Authentication */}
+        <MfaSetup />
+
         {/* Theme Settings */}
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
