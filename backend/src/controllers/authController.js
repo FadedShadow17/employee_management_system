@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Employee from '../models/Employee.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { recordLoginAttempt } from '../middleware/bruteForce.js';
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
@@ -32,9 +33,24 @@ export const signup = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const ipAddress = req.ip;
+  const userAgent = req.headers['user-agent'];
+
   const user = await User.findOne({ email }).select('+password');
-  if (!user || !(await user.comparePassword(password))) throw new AppError('Invalid email or password', 401);
-  if (!user.isActive) throw new AppError('Account is inactive', 403);
+
+  if (!user || !(await user.comparePassword(password))) {
+    // Record failed attempt
+    await recordLoginAttempt(email, ipAddress, userAgent, false, 'invalid_password');
+    throw new AppError('Invalid email or password', 401);
+  }
+
+  if (!user.isActive) {
+    await recordLoginAttempt(email, ipAddress, userAgent, false, 'account_inactive');
+    throw new AppError('Account is inactive', 403);
+  }
+
+  // Record successful login attempt
+  await recordLoginAttempt(email, ipAddress, userAgent, true);
 
   // If MFA is enabled, return a temporary token instead of full auth
   if (user.twoFactorEnabled) {

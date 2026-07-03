@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ const schema = z.object({
 const AuthForm = ({ mode }) => {
   const { user, login, signup } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [lockoutMessage, setLockoutMessage] = useState('');
   const navigate = useNavigate();
   const {
     register,
@@ -28,6 +29,7 @@ const AuthForm = ({ mode }) => {
 
   const onSubmit = async (values) => {
     try {
+      setLockoutMessage('');
       if (mode === 'signup') {
         await signup(values);
         toast.success('Account created successfully!');
@@ -35,7 +37,6 @@ const AuthForm = ({ mode }) => {
       } else {
         const result = await login(values);
         if (result?.mfaRequired) {
-          // Redirect to MFA verification page with temp token
           navigate('/mfa-verify', { state: { tempToken: result.tempToken } });
         } else {
           toast.success('Logged in successfully!');
@@ -43,7 +44,13 @@ const AuthForm = ({ mode }) => {
         }
       }
     } catch (error) {
-      toast.error(unwrapError(error));
+      const msg = unwrapError(error);
+      // Show lockout/rate-limit messages prominently
+      if (msg.includes('locked') || msg.includes('Too many')) {
+        setLockoutMessage(msg);
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
@@ -175,10 +182,18 @@ const AuthForm = ({ mode }) => {
                 )}
               </div>
 
+              {/* Lockout Warning */}
+              {lockoutMessage && (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-400 mt-0.5" />
+                  <p className="text-sm text-red-300">{lockoutMessage}</p>
+                </div>
+              )}
+
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!lockoutMessage}
                 className="btn-primary w-full justify-center gap-2 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 disabled:opacity-60"
               >
                 {isSubmitting ? (

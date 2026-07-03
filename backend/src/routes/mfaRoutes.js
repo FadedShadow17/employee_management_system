@@ -8,11 +8,12 @@ import {
   regenerateBackupCodes
 } from '../controllers/mfaController.js';
 import { protect } from '../middleware/auth.js';
+import { mfaVerifyRateLimiter } from '../middleware/bruteForce.js';
 
 const router = express.Router();
 
 // Public route - verify MFA during login (no auth token yet)
-router.post('/verify-login', verifyMfaLogin);
+router.post('/verify-login', mfaVerifyRateLimiter, verifyMfaLogin);
 
 // Protected routes - require authentication
 router.use(protect);
