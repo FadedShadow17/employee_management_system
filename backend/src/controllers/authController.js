@@ -5,14 +5,34 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { recordLoginAttempt } from '../middleware/bruteForce.js';
 import { validatePassword } from '../utils/passwordPolicy.js';
+import {
+  generateAccessToken,
+  createSession,
+  setAuthCookies,
+  clearAuthCookies,
+  validateRefreshToken,
+  invalidateAllSessions,
+  getUserSessions
+} from '../utils/session.js';
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
-const sendAuth = (res, user, statusCode = 200) => {
-  const token = signToken(user._id);
+const sendAuth = async (res, user, req, statusCode = 200) => {
+  // Generate short-lived access token
+  const accessToken = generateAccessToken(user._id);
+
+  // Create session with refresh token
+  const { refreshToken } = await createSession(user._id, req);
+
+  // Set httpOnly cookies
+  setAuthCookies(res, accessToken, refreshToken);
+
   const cleanUser = user.toObject ? user.toObject() : user;
   delete cleanUser.password;
-  res.status(statusCode).json({ success: true, token, user: cleanUser });
+  delete cleanUser.passwordHistory;
+
+  // Also send token in response body for backward compatibility (mobile/API clients)
+  res.status(statusCode).json({ success: true, token: accessToken, user: cleanUser });
 };
 
 export const signup = asyncHandler(async (req, res) => {
@@ -29,7 +49,7 @@ export const signup = asyncHandler(async (req, res) => {
   });
   user.employee = employee._id;
   await user.save();
-  sendAuth(res, user, 201);
+  await sendAuth(res, user, req, 201);
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -70,14 +90,18 @@ export const login = asyncHandler(async (req, res) => {
   // Check password expiry — warn but still allow login
   const passwordExpired = user.isPasswordExpired() || user.mustChangePassword;
 
-  const token = signToken(user._id);
+  // Generate session tokens
+  const accessToken = generateAccessToken(user._id);
+  const { refreshToken } = await createSession(user._id, req);
+  setAuthCookies(res, accessToken, refreshToken);
+
   const cleanUser = user.toObject ? user.toObject() : user;
   delete cleanUser.password;
   delete cleanUser.passwordHistory;
 
   res.json({
     success: true,
-    token,
+    token: accessToken,
     user: cleanUser,
     ...(passwordExpired && { passwordExpired: true, message: 'Your password has expired. Please change it.' })
   });
@@ -119,5 +143,75 @@ export const changePassword = asyncHandler(async (req, res) => {
   user.mustChangePassword = false;
   await user.save();
 
-  sendAuth(res, user);
+  // Invalidate all other sessions (password changed = old tokens invalid)
+  await invalidateAllSessions(user._id);
+
+  await sendAuth(res, user, req);
+});
+
+// Refresh access token using refresh token
+export const refreshToken = asyncHandler(async (req, res) => {
+  const token = req.cookies?.ems_refresh_token || req.body?.refreshToken;
+  if (!token) throw new AppError('Refresh token is required', 401);
+
+  const session = await validateRefreshToken(token, req);
+  if (!session) {
+    clearAuthCookies(res);
+    throw new AppError('Invalid or expired session. Please log in again.', 401);
+  }
+
+  // Generate new access token
+  const accessToken = generateAccessToken(session.user);
+
+  // Set new access token cookie
+  res.cookie('ems_access_token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 15 * 60 * 1000
+  });
+
+  res.json({ success: true, token: accessToken });
+});
+
+// Logout - invalidate current session
+export const logout = asyncHandler(async (req, res) => {
+  const token = req.cookies?.ems_refresh_token;
+
+  if (token) {
+    const Session = (await import('../models/Session.js')).default;
+    const hashedToken = Session.hashToken(token);
+    await Session.updateOne({ token: hashedToken }, { isActive: false });
+  }
+
+  clearAuthCookies(res);
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// Logout from all devices
+export const logoutAll = asyncHandler(async (req, res) => {
+  await invalidateAllSessions(req.user._id);
+  clearAuthCookies(res);
+  res.json({ success: true, message: 'Logged out from all devices' });
+});
+
+// Get active sessions for the current user
+export const getSessions = asyncHandler(async (req, res) => {
+  const sessions = await getUserSessions(req.user._id);
+  res.json({ success: true, data: sessions });
+});
+
+// Revoke a specific session
+export const revokeSession = asyncHandler(async (req, res) => {
+  const { sessionId } = req.params;
+  const Session = (await import('../models/Session.js')).default;
+
+  const session = await Session.findOne({ _id: sessionId, user: req.user._id });
+  if (!session) throw new AppError('Session not found', 404);
+
+  session.isActive = false;
+  await session.save();
+
+  res.json({ success: true, message: 'Session revoked' });
 });

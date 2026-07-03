@@ -8,6 +8,7 @@ import { unwrapError } from '../utils/format.js';
 import { EmptyState, LoadingSkeleton } from '../components/UI.jsx';
 import { MfaSetup } from '../components/MfaSetup.jsx';
 import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter.jsx';
+import { SessionManager } from '../components/SessionManager.jsx';
 
 export const Notifications = () => {
   const [items, setItems] = useState([]);
@@ -227,6 +228,9 @@ export const Settings = () => {
       <div className="grid gap-6">
         {/* Two-Factor Authentication */}
         <MfaSetup />
+
+        {/* Active Sessions */}
+        <SessionManager />
 
         {/* Theme Settings */}
         <div className="card">

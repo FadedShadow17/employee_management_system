@@ -48,7 +48,12 @@ export const AuthProvider = ({ children }) => {
     toast.success('Account created');
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Proceed with client-side logout even if server call fails
+    }
     localStorage.removeItem('ems_token');
     setUser(null);
     toast.success('Logged out');
