@@ -5,6 +5,7 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { recordLoginAttempt } from '../middleware/bruteForce.js';
 import { validatePassword } from '../utils/passwordPolicy.js';
+import { logActivity, logSecurityEvent } from '../utils/activity.js';
 import {
   generateAccessToken,
   createSession,
@@ -62,16 +63,30 @@ export const login = asyncHandler(async (req, res) => {
   if (!user || !(await user.comparePassword(password))) {
     // Record failed attempt
     await recordLoginAttempt(email, ipAddress, userAgent, false, 'invalid_password');
+    await logActivity({
+      user: user?._id, action: 'login_failed', entity: 'Auth',
+      message: `Failed login attempt for ${email}`, req,
+      severity: 'medium', metadata: { email, reason: 'invalid_password' }
+    });
     throw new AppError('Invalid email or password', 401);
   }
 
   if (!user.isActive) {
     await recordLoginAttempt(email, ipAddress, userAgent, false, 'account_inactive');
+    await logActivity({
+      user: user._id, action: 'login_failed', entity: 'Auth',
+      message: `Login attempt on inactive account: ${email}`, req,
+      severity: 'high', metadata: { email, reason: 'account_inactive' }
+    });
     throw new AppError('Account is inactive', 403);
   }
 
   // Record successful login attempt
   await recordLoginAttempt(email, ipAddress, userAgent, true);
+  await logActivity({
+    user: user._id, action: 'login', entity: 'Auth',
+    message: `Successful login: ${email}`, req
+  });
 
   // If MFA is enabled, return a temporary token instead of full auth
   if (user.twoFactorEnabled) {
@@ -146,6 +161,11 @@ export const changePassword = asyncHandler(async (req, res) => {
   // Invalidate all other sessions (password changed = old tokens invalid)
   await invalidateAllSessions(user._id);
 
+  await logActivity({
+    user: user._id, action: 'password_change', entity: 'User', entityId: user._id,
+    message: 'Password changed successfully', req, severity: 'medium'
+  });
+
   await sendAuth(res, user, req);
 });
 
@@ -193,6 +213,10 @@ export const logout = asyncHandler(async (req, res) => {
 export const logoutAll = asyncHandler(async (req, res) => {
   await invalidateAllSessions(req.user._id);
   clearAuthCookies(res);
+  await logActivity({
+    user: req.user._id, action: 'logout', entity: 'Session',
+    message: 'Logged out from all devices', req, severity: 'medium'
+  });
   res.json({ success: true, message: 'Logged out from all devices' });
 });
 
@@ -212,6 +236,11 @@ export const revokeSession = asyncHandler(async (req, res) => {
 
   session.isActive = false;
   await session.save();
+
+  await logActivity({
+    user: req.user._id, action: 'session_revoked', entity: 'Session', entityId: session._id,
+    message: `Session revoked (device: ${session.deviceInfo || 'unknown'})`, req
+  });
 
   res.json({ success: true, message: 'Session revoked' });
 });

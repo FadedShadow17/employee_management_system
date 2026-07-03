@@ -11,6 +11,8 @@ router.route('/')
   .post(validate(createLeaveSchema), createLeave);
 router.route('/:id')
   .get(validate(idParamSchema), getLeave)
-  .patch(authorize('Admin', 'HR Manager'), validate(updateLeaveSchema), updateLeave)
-  .delete(authorize('Admin', 'HR Manager'), validate(idParamSchema), deleteLeave);
+  // Admin/HR can approve/reject; employees can edit their own pending leaves (enforced in controller)
+  .patch(validate(updateLeaveSchema), updateLeave)
+  // Employees can delete their own pending; Admin/HR can delete any (enforced in controller)
+  .delete(validate(idParamSchema), deleteLeave);
 export default router;

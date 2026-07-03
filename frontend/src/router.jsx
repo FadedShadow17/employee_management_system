@@ -11,6 +11,7 @@ import { Landing } from './pages/Landing.jsx';
 import { Announcements, Attendance, Departments, Employees, Leaves, Payroll, Performance, Tasks } from './pages/modules.jsx';
 import { TaskBoard } from './pages/TaskBoard.jsx';
 import { Forbidden, NotFound, Notifications, Profile, Settings } from './pages/UtilityPages.jsx';
+import SecurityDashboard from './components/SecurityDashboard.jsx';
 
 const WithUser = ({ Component }) => {
   const { user } = useAuth();
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
           { path: '/notifications', element: <Notifications /> },
           { path: '/profile', element: <Profile /> },
           { path: '/settings', element: <Settings /> },
+          { path: '/security', element: <SecurityDashboard /> },
           { path: '*', element: <NotFound /> }
         ]
       }

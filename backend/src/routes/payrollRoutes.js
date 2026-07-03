@@ -6,11 +6,15 @@ import { createPayrollSchema, updatePayrollSchema, idParamSchema } from '../vali
 
 const router = express.Router();
 router.use(protect);
+
+// All users can view payroll (scoped by role in controller)
 router.route('/')
   .get(listPayroll)
   .post(authorize('Admin', 'HR Manager'), validate(createPayrollSchema), createPayroll);
+
 router.route('/:id')
   .get(validate(idParamSchema), getPayroll)
-  .patch(authorize('Admin', 'HR Manager'), validate(updatePayrollSchema), updatePayroll)
+  .patch(authorize('Admin', 'HR Manager'), validate(idParamSchema), validate(updatePayrollSchema), updatePayroll)
   .delete(authorize('Admin'), validate(idParamSchema), deletePayroll);
+
 export default router;

@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import authRoutes from './routes/authRoutes.js';
 import mfaRoutes from './routes/mfaRoutes.js';
 import securityRoutes from './routes/securityRoutes.js';
+import monitoringRoutes from './routes/monitoringRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
@@ -20,6 +21,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { enforceHttps, additionalSecurityHeaders } from './middleware/httpsEnforce.js';
 import { sanitizeInput } from './middleware/sanitize.js';
 import { setCsrfToken, verifyCsrfToken, getCsrfToken } from './middleware/csrf.js';
+import { auditLog } from './middleware/auditLog.js';
 
 dotenv.config();
 
@@ -41,11 +43,15 @@ app.use(sanitizeInput);
 app.use(setCsrfToken);     // Set CSRF cookie on every request
 app.use(verifyCsrfToken);  // Verify CSRF token on state-changing requests
 
+// Audit logging — records all state-changing requests
+app.use(auditLog);
+
 app.get('/api/health', (_req, res) => res.json({ success: true, message: 'EMS API is healthy' }));
 app.get('/api/csrf-token', getCsrfToken); // Endpoint for SPA to get CSRF token
 app.use('/api/auth', authRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/departments', departmentRoutes);
