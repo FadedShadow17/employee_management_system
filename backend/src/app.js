@@ -18,6 +18,8 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import { announcementRoutes, departmentRoutes, notificationRoutes, performanceRoutes } from './routes/resourceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { enforceHttps, additionalSecurityHeaders } from './middleware/httpsEnforce.js';
+import { sanitizeInput } from './middleware/sanitize.js';
+import { setCsrfToken, verifyCsrfToken, getCsrfToken } from './middleware/csrf.js';
 
 dotenv.config();
 
@@ -32,7 +34,15 @@ app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 
+// Input sanitization (XSS + NoSQL injection prevention)
+app.use(sanitizeInput);
+
+// CSRF protection
+app.use(setCsrfToken);     // Set CSRF cookie on every request
+app.use(verifyCsrfToken);  // Verify CSRF token on state-changing requests
+
 app.get('/api/health', (_req, res) => res.json({ success: true, message: 'EMS API is healthy' }));
+app.get('/api/csrf-token', getCsrfToken); // Endpoint for SPA to get CSRF token
 app.use('/api/auth', authRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/security', securityRoutes);

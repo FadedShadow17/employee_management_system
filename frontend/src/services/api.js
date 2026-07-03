@@ -5,10 +5,25 @@ export const api = axios.create({
   withCredentials: true // Send cookies with every request
 });
 
-// Request interceptor — attach token from localStorage (fallback for cookie-based auth)
+// Helper to read a cookie by name
+const getCookie = (name) => {
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? match[2] : null;
+};
+
+// Request interceptor — attach Bearer token + CSRF token
 api.interceptors.request.use((config) => {
+  // Attach access token
   const token = localStorage.getItem('ems_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // Attach CSRF token for state-changing requests
+  const method = (config.method || '').toUpperCase();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = getCookie('ems_csrf_token');
+    if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+  }
+
   return config;
 });
 
