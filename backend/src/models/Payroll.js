@@ -1,14 +1,15 @@
 import mongoose from 'mongoose';
+import { encryptionPlugin } from '../utils/encryptionPlugin.js';
 
 const payrollSchema = new mongoose.Schema(
   {
     employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
-    basicSalary: { type: Number, required: true },
-    allowance: { type: Number, default: 0 },
-    bonus: { type: Number, default: 0 },
-    deduction: { type: Number, default: 0 },
-    tax: { type: Number, default: 0 },
-    netSalary: { type: Number, default: 0 },
+    basicSalary: { type: String, required: true },   // Encrypted
+    allowance: { type: String, default: '0' },       // Encrypted
+    bonus: { type: String, default: '0' },           // Encrypted
+    deduction: { type: String, default: '0' },       // Encrypted
+    tax: { type: String, default: '0' },             // Encrypted
+    netSalary: { type: String, default: '0' },       // Encrypted
     month: { type: Number, min: 1, max: 12, required: true },
     year: { type: Number, required: true },
     paymentStatus: { type: String, enum: ['Pending', 'Paid'], default: 'Pending' },
@@ -17,8 +18,21 @@ const payrollSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Apply encryption to all financial fields
+payrollSchema.plugin(encryptionPlugin, {
+  numericFields: ['basicSalary', 'allowance', 'bonus', 'deduction', 'tax', 'netSalary']
+});
+
+// Calculate net salary before encryption (runs before the plugin's pre-save)
 payrollSchema.pre('save', function calculateNet(next) {
-  this.netSalary = this.basicSalary + this.allowance + this.bonus - this.deduction - this.tax;
+  // Convert to numbers for calculation (values may already be numbers from API input)
+  const basic = Number(this.basicSalary) || 0;
+  const allowance = Number(this.allowance) || 0;
+  const bonus = Number(this.bonus) || 0;
+  const deduction = Number(this.deduction) || 0;
+  const tax = Number(this.tax) || 0;
+
+  this.netSalary = String(basic + allowance + bonus - deduction - tax);
   next();
 });
 

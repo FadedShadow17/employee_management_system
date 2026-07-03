@@ -17,12 +17,15 @@ import payrollRoutes from './routes/payrollRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import { announcementRoutes, departmentRoutes, notificationRoutes, performanceRoutes } from './routes/resourceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { enforceHttps, additionalSecurityHeaders } from './middleware/httpsEnforce.js';
 
 dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy for correct IP detection
+app.use(enforceHttps);
 app.use(helmet());
+app.use(additionalSecurityHeaders);
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));

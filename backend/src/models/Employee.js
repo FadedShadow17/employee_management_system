@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { encryptionPlugin } from '../utils/encryptionPlugin.js';
 
 const emergencyContactSchema = new mongoose.Schema(
   { name: String, relationship: String, phone: String },
@@ -11,16 +12,16 @@ const employeeSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
-    phone: String,
-    address: String,
+    phone: { type: String }, // Encrypted at rest
+    address: { type: String }, // Encrypted at rest
     profileImage: String,
-    dateOfBirth: Date,
+    dateOfBirth: { type: String }, // Stored as encrypted string
     gender: { type: String, enum: ['Male', 'Female', 'Other', 'Prefer not to say'], default: 'Prefer not to say' },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
     jobTitle: { type: String, required: true },
     employmentType: { type: String, enum: ['Full Time', 'Part Time', 'Contract', 'Intern'], default: 'Full Time' },
     joiningDate: { type: Date, default: Date.now },
-    salary: { type: Number, default: 0 },
+    salary: { type: String, default: '0' }, // Encrypted numeric field stored as string
     manager: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
     skills: [String],
     emergencyContact: emergencyContactSchema,
@@ -29,6 +30,12 @@ const employeeSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Apply field-level encryption to sensitive fields
+employeeSchema.plugin(encryptionPlugin, {
+  fields: ['phone', 'address', 'dateOfBirth'],
+  numericFields: ['salary']
+});
 
 employeeSchema.index({ fullName: 'text', email: 'text', jobTitle: 'text' });
 
