@@ -10,12 +10,21 @@ import {
   checkAccountLockout,
   checkIpBlocking
 } from '../middleware/bruteForce.js';
+import { validatePassword } from '../utils/passwordPolicy.js';
 
 const router = express.Router();
 
 // Public routes with brute-force protection
 router.post('/signup', signupRateLimiter, validate(signupSchema), signup);
 router.post('/login', loginRateLimiter, checkIpBlocking, checkAccountLockout, validate(loginSchema), login);
+
+// Password strength check (public - for real-time feedback during signup)
+router.post('/check-password-strength', (req, res) => {
+  const { password, name, email } = req.body;
+  if (!password) return res.json({ success: true, data: { strength: 'weak', score: 0, errors: [] } });
+  const result = validatePassword(password, { name, email });
+  res.json({ success: true, data: result });
+});
 
 // Protected routes
 router.get('/me', protect, me);

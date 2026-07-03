@@ -30,6 +30,13 @@ export const AuthProvider = ({ children }) => {
 
     localStorage.setItem('ems_token', data.token);
     setUser(data.user);
+
+    // Warn if password has expired
+    if (data.passwordExpired) {
+      toast('Your password has expired. Please change it in your profile.', { icon: '⚠️', duration: 6000 });
+      return { mfaRequired: false, passwordExpired: true };
+    }
+
     toast.success('Welcome back');
     return { mfaRequired: false };
   };

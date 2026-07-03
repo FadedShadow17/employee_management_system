@@ -7,23 +7,40 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../context/AuthContext.jsx';
 import { unwrapError } from '../utils/format.js';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter.jsx';
 
-const schema = z.object({
-  name: z.string().optional(),
+const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters')
+  password: z.string().min(1, 'Password is required')
+});
+
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Must contain an uppercase letter')
+    .regex(/[a-z]/, 'Must contain a lowercase letter')
+    .regex(/\d/, 'Must contain a number')
+    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/, 'Must contain a special character')
 });
 
 const AuthForm = ({ mode }) => {
   const { user, login, signup } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [lockoutMessage, setLockoutMessage] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
   const navigate = useNavigate();
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting }
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({ resolver: zodResolver(mode === 'signup' ? signupSchema : loginSchema) });
+
+  // Watch form fields for the password strength meter
+  const watchedName = watch('name', '');
+  const watchedEmail = watch('email', '');
 
   if (user) return <Navigate to="/dashboard" replace />;
 
@@ -38,6 +55,8 @@ const AuthForm = ({ mode }) => {
         const result = await login(values);
         if (result?.mfaRequired) {
           navigate('/mfa-verify', { state: { tempToken: result.tempToken } });
+        } else if (result?.passwordExpired) {
+          navigate('/profile');
         } else {
           toast.success('Logged in successfully!');
           navigate('/dashboard');
@@ -163,7 +182,9 @@ const AuthForm = ({ mode }) => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     className="input w-full bg-white/5 pl-10 pr-10 text-white placeholder:text-slate-500 border-white/20"
-                    {...register('password')}
+                    {...register('password', {
+                      onChange: (e) => setPasswordValue(e.target.value)
+                    })}
                   />
                   <button
                     type="button"
@@ -179,6 +200,15 @@ const AuthForm = ({ mode }) => {
                 </div>
                 {errors.password && (
                   <p className="mt-1 text-sm text-rose-400">{errors.password.message}</p>
+                )}
+                {/* Password strength meter - only on signup */}
+                {mode === 'signup' && (
+                  <PasswordStrengthMeter
+                    password={passwordValue}
+                    name={watchedName}
+                    email={watchedEmail}
+                    variant="dark"
+                  />
                 )}
               </div>
 

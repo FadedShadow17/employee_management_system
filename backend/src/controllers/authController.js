@@ -4,6 +4,7 @@ import Employee from '../models/Employee.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { recordLoginAttempt } from '../middleware/bruteForce.js';
+import { validatePassword } from '../utils/passwordPolicy.js';
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
@@ -66,7 +67,20 @@ export const login = asyncHandler(async (req, res) => {
     });
   }
 
-  sendAuth(res, user);
+  // Check password expiry — warn but still allow login
+  const passwordExpired = user.isPasswordExpired() || user.mustChangePassword;
+
+  const token = signToken(user._id);
+  const cleanUser = user.toObject ? user.toObject() : user;
+  delete cleanUser.password;
+  delete cleanUser.passwordHistory;
+
+  res.json({
+    success: true,
+    token,
+    user: cleanUser,
+    ...(passwordExpired && { passwordExpired: true, message: 'Your password has expired. Please change it.' })
+  });
 });
 
 export const me = asyncHandler(async (req, res) => {
@@ -76,9 +90,34 @@ export const me = asyncHandler(async (req, res) => {
 
 export const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  const user = await User.findById(req.user._id).select('+password');
-  if (!(await user.comparePassword(currentPassword))) throw new AppError('Current password is incorrect', 400);
+  const user = await User.findById(req.user._id).select('+password +passwordHistory');
+
+  // Verify current password
+  if (!(await user.comparePassword(currentPassword))) {
+    throw new AppError('Current password is incorrect', 400);
+  }
+
+  // Check new password is not same as current
+  if (await user.comparePassword(newPassword)) {
+    throw new AppError('New password must be different from your current password', 400);
+  }
+
+  // Check password reuse (last 5 passwords)
+  if (await user.isPasswordReused(newPassword)) {
+    throw new AppError('This password has been used recently. Please choose a different password.', 400);
+  }
+
+  // Validate password against policy (with user context for name/email checks)
+  const policyResult = validatePassword(newPassword, { name: user.name, email: user.email });
+  if (!policyResult.isValid) {
+    throw new AppError(policyResult.errors[0], 400);
+  }
+
+  // Store old password hash for history before changing
+  user.$__.saveOptions = { _previousPassword: user.password };
   user.password = newPassword;
+  user.mustChangePassword = false;
   await user.save();
+
   sendAuth(res, user);
 });

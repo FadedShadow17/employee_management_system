@@ -7,6 +7,7 @@ import { api, listResource, updateResource } from '../services/api.js';
 import { unwrapError } from '../utils/format.js';
 import { EmptyState, LoadingSkeleton } from '../components/UI.jsx';
 import { MfaSetup } from '../components/MfaSetup.jsx';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter.jsx';
 
 export const Notifications = () => {
   const [items, setItems] = useState([]);
@@ -189,7 +190,13 @@ export const Profile = () => {
                 className="input mt-2"
                 value={form.newPassword}
                 onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="Enter new password (min 8 characters)"
+                placeholder="Enter new password"
+              />
+              <PasswordStrengthMeter
+                password={form.newPassword}
+                name={user?.name}
+                email={user?.email}
+                variant="light"
               />
             </label>
 
