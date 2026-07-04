@@ -36,6 +36,8 @@ const run = async () => {
     Task.deleteMany(),
     User.deleteMany()
   ]);
+  await Employee.collection.dropIndexes().catch(() => {});
+  await Employee.syncIndexes();
 
   const admin = await User.create({ name: 'System Admin', email: 'admin@example.com', password: 'Admin@123', role: 'Admin' });
   const hrUser = await User.create({ name: 'Hira Manager', email: 'hr@example.com', password: 'Admin@123', role: 'HR Manager' });
@@ -51,69 +53,68 @@ const run = async () => {
     { name: 'Finance', description: 'Payroll, budgets, and compliance.' }
   ]);
 
-  const employees = await Employee.create([
-    {
-      user: hrUser._id,
-      fullName: hrUser.name,
-      email: hrUser.email,
-      phone: '+977-9800000001',
-      address: 'Kathmandu, Nepal',
-      profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-      dateOfBirth: '1991-05-12',
-      gender: 'Female',
-      department: departments[1]._id,
-      jobTitle: 'HR Manager',
-      employmentType: 'Full Time',
-      salary: 95000,
-      skills: ['Hiring', 'Policy', 'People Analytics'],
-      emergencyContact: { name: 'Suman', relationship: 'Spouse', phone: '+977-9800000010' },
-      createdBy: admin._id
-    },
-    {
-      user: employeeUsers[0]._id,
-      fullName: employeeUsers[0].name,
-      email: employeeUsers[0].email,
-      phone: '+977-9800000002',
-      address: 'Lalitpur, Nepal',
-      profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
-      dateOfBirth: '1996-08-20',
-      gender: 'Male',
-      department: departments[0]._id,
-      jobTitle: 'Frontend Engineer',
-      salary: 82000,
-      skills: ['React', 'Tailwind', 'Testing'],
-      createdBy: admin._id
-    },
-    {
-      user: employeeUsers[1]._id,
-      fullName: employeeUsers[1].name,
-      email: employeeUsers[1].email,
-      phone: '+977-9800000003',
-      address: 'Bhaktapur, Nepal',
-      profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80',
-      dateOfBirth: '1998-11-03',
-      gender: 'Female',
-      department: departments[0]._id,
-      jobTitle: 'Backend Engineer',
-      salary: 84000,
-      skills: ['Node.js', 'MongoDB', 'APIs'],
-      createdBy: admin._id
-    },
-    {
-      user: employeeUsers[2]._id,
-      fullName: employeeUsers[2].name,
-      email: employeeUsers[2].email,
-      phone: '+977-9800000004',
-      address: 'Pokhara, Nepal',
-      dateOfBirth: '1994-02-14',
-      gender: 'Female',
-      department: departments[2]._id,
-      jobTitle: 'Payroll Analyst',
-      salary: 76000,
-      skills: ['Payroll', 'Excel', 'Compliance'],
-      createdBy: admin._id
-    }
-  ]);
+  const employees = [];
+  employees.push(await Employee.create({
+    user: hrUser._id,
+    fullName: hrUser.name,
+    email: hrUser.email,
+    phone: '+977-9800000001',
+    address: 'Kathmandu, Nepal',
+    profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
+    dateOfBirth: '1991-05-12',
+    gender: 'Female',
+    department: departments[1]._id,
+    jobTitle: 'HR Manager',
+    employmentType: 'Full Time',
+    salary: 95000,
+    skills: ['Hiring', 'Policy', 'People Analytics'],
+    emergencyContact: { name: 'Suman', relationship: 'Spouse', phone: '+977-9800000010' },
+    createdBy: admin._id
+  }));
+  employees.push(await Employee.create({
+    user: employeeUsers[0]._id,
+    fullName: employeeUsers[0].name,
+    email: employeeUsers[0].email,
+    phone: '+977-9800000002',
+    address: 'Lalitpur, Nepal',
+    profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
+    dateOfBirth: '1996-08-20',
+    gender: 'Male',
+    department: departments[0]._id,
+    jobTitle: 'Frontend Engineer',
+    salary: 82000,
+    skills: ['React', 'Tailwind', 'Testing'],
+    createdBy: admin._id
+  }));
+  employees.push(await Employee.create({
+    user: employeeUsers[1]._id,
+    fullName: employeeUsers[1].name,
+    email: employeeUsers[1].email,
+    phone: '+977-9800000003',
+    address: 'Bhaktapur, Nepal',
+    profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80',
+    dateOfBirth: '1998-11-03',
+    gender: 'Female',
+    department: departments[0]._id,
+    jobTitle: 'Backend Engineer',
+    salary: 84000,
+    skills: ['Node.js', 'MongoDB', 'APIs'],
+    createdBy: admin._id
+  }));
+  employees.push(await Employee.create({
+    user: employeeUsers[2]._id,
+    fullName: employeeUsers[2].name,
+    email: employeeUsers[2].email,
+    phone: '+977-9800000004',
+    address: 'Pokhara, Nepal',
+    dateOfBirth: '1994-02-14',
+    gender: 'Female',
+    department: departments[2]._id,
+    jobTitle: 'Payroll Analyst',
+    salary: 76000,
+    skills: ['Payroll', 'Excel', 'Compliance'],
+    createdBy: admin._id
+  }));
 
   await Promise.all([
     User.findByIdAndUpdate(hrUser._id, { employee: employees[0]._id }),

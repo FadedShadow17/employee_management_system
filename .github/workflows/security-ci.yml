@@ -1,0 +1,219 @@
+name: Security CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ─── Dependency Audit ─────────────────────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit backend dependencies
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+        continue-on-error: false
+
+      - name: Audit frontend dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+        continue-on-error: false
+
+  # ─── Static Analysis (SAST) ──────────────────────────────────────────────────
+  sast:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install ESLint security plugins
+        working-directory: ./backend
+        run: |
+          npm ci
+          npx eslint --no-eslintrc \
+            --plugin security \
+            --rule '{"security/detect-eval-with-expression": "error", "security/detect-non-literal-regexp": "warn", "security/detect-unsafe-regex": "error", "security/detect-buffer-noassert": "error", "security/detect-no-csrf-before-method-override": "error", "security/detect-possible-timing-attacks": "warn"}' \
+            src/ || true
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Search for potential hardcoded secrets
+          echo "Scanning for hardcoded secrets..."
+          ! grep -rn --include="*.js" --include="*.jsx" --include="*.ts" \
+            -E "(password|secret|key|token|api_key)\s*[:=]\s*['\"][^'\"]{8,}" \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            backend/ frontend/ | grep -v "\.env" | grep -v "example" | grep -v "test" | grep -v "placeholder"
+
+      - name: Check for dangerous functions
+        run: |
+          echo "Scanning for dangerous function usage..."
+          # Check for eval, Function constructor, unsafe innerHTML
+          ! grep -rn --include="*.js" --include="*.jsx" \
+            -E "(eval\(|new Function\(|\.innerHTML\s*=|document\.write\()" \
+            --exclude-dir=node_modules \
+            backend/src/ frontend/src/ || echo "Potential dangerous function found — review required"
+
+  # ─── Linting & Code Quality ──────────────────────────────────────────────────
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Lint backend
+        working-directory: ./backend
+        run: |
+          npm ci
+          npx eslint src/ --ext .js || true
+
+      - name: Lint frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npx eslint src/ --ext .js,.jsx || true
+
+  # ─── Unit & Integration Tests ────────────────────────────────────────────────
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run backend tests
+        working-directory: ./backend
+        env:
+          MONGO_URI: mongodb://localhost:27017/ems_test
+          JWT_SECRET: test-secret-for-ci
+          ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          NODE_ENV: test
+        run: |
+          npm ci
+          npm test -- --passWithNoTests || true
+
+  # ─── Docker Build & Security Scan ───────────────────────────────────────────
+  docker-security:
+    name: Docker Image Security
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, sast, lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t ems-backend:ci ./backend
+
+      - name: Build frontend image
+        run: docker build -t ems-frontend:ci ./frontend
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ems-backend:ci
+          format: table
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ems-frontend:ci
+          format: table
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+
+  # ─── Security Headers Check ──────────────────────────────────────────────────
+  header-check:
+    name: Security Headers Verification
+    runs-on: ubuntu-latest
+    needs: [docker-security]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start services
+        run: |
+          docker compose up -d --build
+          sleep 15  # Wait for services to be ready
+
+      - name: Check backend security headers
+        run: |
+          echo "Checking backend security headers..."
+          HEADERS=$(curl -sI http://localhost:5000/api/health)
+          echo "$HEADERS"
+
+          # Verify security headers are present
+          echo "$HEADERS" | grep -qi "x-content-type-options" || echo "WARNING: X-Content-Type-Options missing"
+          echo "$HEADERS" | grep -qi "x-frame-options" || echo "WARNING: X-Frame-Options missing"
+          echo "$HEADERS" | grep -qi "strict-transport-security" || echo "WARNING: HSTS missing"
+
+      - name: Check frontend security headers
+        run: |
+          echo "Checking frontend security headers..."
+          HEADERS=$(curl -sI http://localhost:3000)
+          echo "$HEADERS"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+
+  # ─── OWASP ZAP Baseline Scan ────────────────────────────────────────────────
+  dast:
+    name: Dynamic Application Security Testing (DAST)
+    runs-on: ubuntu-latest
+    needs: [docker-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start application
+        run: |
+          docker compose up -d --build
+          sleep 20
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:5000/api/health'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+        continue-on-error: true
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

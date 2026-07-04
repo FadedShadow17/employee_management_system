@@ -30,7 +30,16 @@ app.set('trust proxy', 1); // Trust first proxy for correct IP detection
 app.use(enforceHttps);
 app.use(helmet());
 app.use(additionalSecurityHeaders);
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
+      return callback(null, true);
+    }
+    const allowed = process.env.CLIENT_URL || 'http://localhost:5173';
+    callback(null, origin === allowed);
+  },
+  credentials: true
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
