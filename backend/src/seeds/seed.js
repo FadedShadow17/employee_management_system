@@ -67,6 +67,7 @@ const run = async () => {
     jobTitle: 'HR Manager',
     employmentType: 'Full Time',
     salary: 95000,
+    currency: 'NPR',
     skills: ['Hiring', 'Policy', 'People Analytics'],
     emergencyContact: { name: 'Suman', relationship: 'Spouse', phone: '+977-9800000010' },
     createdBy: admin._id
@@ -83,6 +84,7 @@ const run = async () => {
     department: departments[0]._id,
     jobTitle: 'Frontend Engineer',
     salary: 82000,
+    currency: 'NPR',
     skills: ['React', 'Tailwind', 'Testing'],
     createdBy: admin._id
   }));
@@ -98,6 +100,7 @@ const run = async () => {
     department: departments[0]._id,
     jobTitle: 'Backend Engineer',
     salary: 84000,
+    currency: 'NPR',
     skills: ['Node.js', 'MongoDB', 'APIs'],
     createdBy: admin._id
   }));
@@ -112,6 +115,7 @@ const run = async () => {
     department: departments[2]._id,
     jobTitle: 'Payroll Analyst',
     salary: 76000,
+    currency: 'NPR',
     skills: ['Payroll', 'Excel', 'Compliance'],
     createdBy: admin._id
   }));
@@ -133,9 +137,13 @@ const run = async () => {
   today.setHours(0, 0, 0, 0);
   await Attendance.create(employees.map((employee, index) => ({ employee: employee._id, date: today, checkIn: new Date(today.getTime() + 9 * 36e5 + index * 600000), checkOut: new Date(today.getTime() + 17 * 36e5), workingHours: 8, status: index === 2 ? 'Late' : 'Present', correctedBy: admin._id })));
   await Leave.create([{ employee: employees[2]._id, type: 'Annual', startDate: new Date(Date.now() + 86400000 * 7), endDate: new Date(Date.now() + 86400000 * 9), reason: 'Family event', status: 'Pending' }]);
-  await Payroll.create(employees.map((employee) => ({ employee: employee._id, basicSalary: employee.salary, allowance: 5000, bonus: 3000, deduction: 1000, tax: 0.1 * employee.salary, month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentStatus: 'Pending', createdBy: admin._id })));
+  await Payroll.create(employees.map((employee) => ({ employee: employee._id, basicSalary: employee.salary, allowance: 8000, bonus: 5000, deduction: 2000, tax: 0.1 * employee.salary, month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentStatus: 'Pending', createdBy: admin._id })));
   await PerformanceReview.create([{ employee: employees[1]._id, rating: 4, feedback: 'Strong delivery and thoughtful collaboration.', goals: ['Lead component testing', 'Mentor interns'], reviewer: hrUser._id }]);
-  await Announcement.create([{ title: 'Quarterly town hall', body: 'Join the company town hall this Friday at 3 PM.', audience: 'All', publishedBy: admin._id }]);
+  await Announcement.create([
+    { title: 'Dashain Bonus Distribution', body: 'सबै कर्मचारीहरूलाई यो वर्षको दशैं बोनस असोज २० गते भित्र वितरण गरिनेछ। कृपया आफ्नो बैंक विवरण HR मा अपडेट गर्नुहोस्।', audience: 'All', publishedBy: admin._id },
+    { title: 'Office Closure - Tihar Holiday', body: 'Office will remain closed from Kartik 12 to Kartik 17 for Tihar festival. Emergency contacts will be shared via email.', audience: 'All', publishedBy: admin._id },
+    { title: 'Monthly Staff Meeting', body: 'Monthly staff meeting will be held on the last Friday of every month at 3 PM in the Kathmandu office conference hall. All department heads must attend.', audience: 'All', publishedBy: admin._id }
+  ]);
   await Notification.create(employeeUsers.map((user) => ({ user: user._id, title: 'Welcome to EMS', message: 'Your employee portal is ready.', type: 'success' })));
 
   console.log('Seed completed. Default admin: admin@example.com / Admin@123. Change these credentials in production.');
